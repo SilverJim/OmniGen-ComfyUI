@@ -187,7 +187,7 @@ class OmniGen(nn.Module, PeftAdapterMixin):
         self.llm.config.use_cache = False
     
     @classmethod
-    def from_pretrained(cls, model_name):
+    def from_pretrained(cls, model_name, device='cpu'):
         if not os.path.exists(model_name):
             cache_folder = os.getenv('HF_HUB_CACHE')
             model_name = snapshot_download(repo_id=model_name,
@@ -199,7 +199,7 @@ class OmniGen(nn.Module, PeftAdapterMixin):
             print("Loading safetensors")
             ckpt = load_file(os.path.join(model_name, 'model.safetensors'))
         else:
-            ckpt = torch.load(os.path.join(model_name, 'model.pt'), map_location='cpu')
+            ckpt = torch.load(os.path.join(model_name, 'model.pt'), map_location=device)
         model.load_state_dict(ckpt)
         return model
 

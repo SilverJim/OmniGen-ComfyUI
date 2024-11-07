@@ -6,7 +6,6 @@ aifsh_dir = osp.join(folder_paths.models_dir,"AIFSH")
 sys.path.append(now_dir)
 
 from huggingface_hub import snapshot_download
-omnigen_dir = osp.join(aifsh_dir,"Shitao/OmniGen-v1")
 tmp_dir = osp.join(now_dir, "tmp")
 import os
 import shutil
@@ -18,8 +17,7 @@ from OmniGen import OmniGenPipeline
 
 class OmniGenNode:
     def __init__(self):
-        if not osp.exists(osp.join(omnigen_dir,"model.safetensors")):
-            snapshot_download("Shitao/OmniGen-v1",local_dir=omnigen_dir)
+        pass
             
     @classmethod
     def INPUT_TYPES(s):
@@ -51,7 +49,11 @@ class OmniGenNode:
                 }),
                 "seed": ("INT", {
                     "default": 42
-                })
+                }),
+                "model_name": ("STRING", {
+                    "default": "Shitao/OmniGen-v1",
+                    "tooltip": "Model name to use for generation"
+                }),
             },
             "optional": {
                 "image_1": ("IMAGE",),
@@ -73,8 +75,11 @@ class OmniGenNode:
 
     def gen(self,prompt_text,latent,num_inference_steps,guidance_scale,
             img_guidance_scale,max_input_image_size,store_in_vram,separate_cfg_infer,offload_model,
-            use_input_image_size_as_output,seed,image_1=None,image_2=None,image_3=None):
+            use_input_image_size_as_output,seed,model_name,image_1=None,image_2=None,image_3=None):
         
+        model_path = osp.join(aifsh_dir, model_name)
+        if not osp.exists(osp.join(model_path,"model.safetensors")) and not osp.exists(osp.join(model_path,"model.pt")):
+            snapshot_download("Shitao/OmniGen-v1",local_dir=model_path)
         # Get dimensions from latent
         height = latent["samples"].shape[2] * 8
         width = latent["samples"].shape[3] * 8
@@ -82,10 +87,10 @@ class OmniGenNode:
         # Get or create pipeline based on VRAM storage setting
         if store_in_vram:
             if not hasattr(self, "omnigen_pipe"):
-                self.omnigen_pipe = OmniGenPipeline.from_pretrained(omnigen_dir)
+                self.omnigen_pipe = OmniGenPipeline.from_pretrained(model_path)
             pipe = self.omnigen_pipe
         else:
-            pipe = OmniGenPipeline.from_pretrained(omnigen_dir)
+            pipe = OmniGenPipeline.from_pretrained(model_path)
 
         input_images = []
         os.makedirs(tmp_dir,exist_ok=True)

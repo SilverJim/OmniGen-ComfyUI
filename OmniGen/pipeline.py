@@ -21,7 +21,6 @@ from safetensors.torch import load_file
 
 from OmniGen import OmniGen, OmniGenProcessor, OmniGenScheduler
 
-
 logger = logging.get_logger(__name__) 
 
 EXAMPLE_DOC_STRING = """
@@ -41,8 +40,16 @@ EXAMPLE_DOC_STRING = """
         ```
 """
 
+if torch.cuda.is_available():
+    device = torch.device("cuda")
+elif torch.backends.mps.is_available():
+    device = torch.device("mps")
+elif is_torch_npu_available():
+    device = torch.device("npu")
+else:
+    logger.info("Don't detect any available devices, using CPU instead")
+    device = torch.device("cpu")
 
-90
 class OmniGenPipeline:
     def __init__(
         self,
@@ -54,32 +61,21 @@ class OmniGenPipeline:
         self.model = model
         self.processor = processor
 
-        if torch.cuda.is_available():
-            self.device = torch.device("cuda")
-        elif torch.backends.mps.is_available():
-            self.device = torch.device("mps")
-        elif is_torch_npu_available():
-            self.device = torch.device("npu")
-        else:
-            logger.info("Don't detect any available devices, using CPU instead")
-            self.device = torch.device("cpu")
-
         self.model.to(torch.bfloat16)
         self.model.eval()
         self.vae.eval()
 
         self.model_cpu_offload = False
-
     @classmethod
     def from_pretrained(cls, model_name, vae_path: str=None):
-        if not os.path.exists(model_name) or (not os.path.exists(os.path.join(model_name, 'model.safetensors')) and model_name == "Shitao/OmniGen-v1"):
+        if not os.path.exists(model_name) or (not os.path.exists(os.path.join(model_name, 'model.safetensors')) and model_name=="Shitao/OmniGen-v1"):
             logger.info("Model not found, downloading...")
             cache_folder = os.getenv('HF_HUB_CACHE')
             model_name = snapshot_download(repo_id=model_name,
                                            cache_dir=cache_folder,
-                                           ignore_patterns=['flax_model.msgpack', 'rust_model.ot', 'tf_model.h5', 'model.pt'])
+                                           ignore_patterns=['flax_model.msgpack', 'rust_model.ot', 'tf_model.h5'])
             logger.info(f"Downloaded model to {model_name}")
-        model = OmniGen.from_pretrained(model_name)
+        model = OmniGen.from_pretrained(model_name, device=device)
         processor = OmniGenProcessor.from_pretrained(model_name)
 
         if os.path.exists(os.path.join(model_name, "vae")):
